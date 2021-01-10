@@ -31,7 +31,7 @@ async def async_command_list(config: Optional[str]):
     if config is None:
         config = os.path.join(get_workdir(), "config.json")
     cfg = load_config(config)
-    session = await new_session(os.path.join(get_workdir(), 'session'))
+    session = await new_session(os.path.join(get_workdir(), "session"))
     client = TelegramClient(session, api_id=cfg.api_id, api_hash=cfg.api_hash)
     client = await client.start(phone=cfg.phone)
     dialog_filters: List[types.DialogFilter] = await client(
