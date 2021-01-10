@@ -1,64 +1,37 @@
 import asyncio
-import json
-import os
-import pathlib
-from typing import Optional, List
+from typing import Optional
 
 import click
-from telethon import TelegramClient
-from pydantic.dataclasses import dataclass
-from telethon.tl.functions import messages
-from telethon.tl import types
-from telethon.sessions import SQLiteSession
+from tgfolder.lib import async_command_user_list, async_command_list
+
+config_path_option = click.option("-c", "--config", default=None)
 
 
 @click.group()
-def main():
+def main_group():
     pass
 
 
-@main.command(name="list")
-@click.option("-c", "--config", default=None)
+@main_group.command(name="list")
+@config_path_option
 def command_list(config: Optional[str]):
     asyncio.run(async_command_list(config))
 
 
-def get_workdir() -> str:
-    return os.path.join(os.environ["HOME"], ".tgfolder")
+@main_group.group(name="include_peers")
+def include_peers_group():
+    pass
 
 
-async def async_command_list(config: Optional[str]):
-    if config is None:
-        config = os.path.join(get_workdir(), "config.json")
-    cfg = load_config(config)
-    session = await new_session(os.path.join(get_workdir(), "session"))
-    client = TelegramClient(session, api_id=cfg.api_id, api_hash=cfg.api_hash)
-    client = await client.start(phone=cfg.phone)
-    dialog_filters: List[types.DialogFilter] = await client(
-        messages.GetDialogFiltersRequest()
-    )
-    click.echo(json.dumps([item.title for item in dialog_filters], ensure_ascii=False))
+@include_peers_group.command(name="list")
+@config_path_option
+@click.option("-t", "--title", required=True)
+def command_user_list(config: Optional[str], title):
+    asyncio.run(async_command_user_list(config, target_title=title))
 
 
-async def new_session(path: str) -> SQLiteSession:
-    p = pathlib.Path(path)
-    if not p.parent.exists():
-        p.parent.mkdir(0o755, parents=True)
-    return SQLiteSession(path)
-
-
-@dataclass
-class Config:
-    api_id: int
-    api_hash: str
-    phone: str
-
-
-def load_config(path: str) -> Config:
-    with open(path) as f:
-        content = json.load(f)
-
-    return Config(**content)
+def main():
+    main_group()
 
 
 if __name__ == "__main__":
