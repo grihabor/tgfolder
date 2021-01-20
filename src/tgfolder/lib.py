@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import pathlib
+import sys
 from typing import Optional, List, Any, Dict, Set
 
 import click
@@ -9,13 +10,13 @@ from pydantic.dataclasses import dataclass
 from telethon import TelegramClient
 from telethon.sessions import SQLiteSession
 from telethon.tl import types
-from telethon.tl.functions import messages, contacts
+from telethon.tl.functions import messages
 
 
 async def async_command_include_peers_group_add(
-    config: Optional[str], folder_title: str, chat_ids: List[int], dry_run: bool
+    folder_title: str, chat_ids: List[int], dry_run: bool
 ):
-    client = await new_client(config)
+    client = await new_client()
     dialog_filter = await get_dialog_filter(client, folder_title)
     if dialog_filter is None:
         raise RuntimeError(f"Folder not found: {folder_title}")
@@ -27,7 +28,8 @@ async def async_command_include_peers_group_add(
     )
     chats_to_add = chats_we_want - chats_already_included
 
-    await client.get_dialogs(ignore_pinned=False)
+    loaded_dialogs = await client.get_dialogs(ignore_pinned=False)
+    print(f"loaded dialogs: {len(loaded_dialogs)}", file=sys.stderr)
     entities = await asyncio.gather(
         *[client.get_entity(chat_id) for chat_id in chats_to_add]
     )
@@ -97,8 +99,8 @@ def get_entity_id(e: types.TypeInputPeer) -> Optional[int]:
     return None
 
 
-async def async_command_common_chat_list(config: Optional[str], user_ids: List[int]):
-    client = await new_client(config)
+async def async_command_common_chat_list(user_ids: List[int]):
+    client = await new_client()
 
     async def get_common_chats(user_id: int) -> Set[int]:
         result = await client(
@@ -135,8 +137,8 @@ async def get_dialog_filter(client, title: str) -> Optional[types.DialogFilter]:
     return found[0]
 
 
-async def async_command_user_list(config: Optional[str], folder_title: str):
-    client = await new_client(config)
+async def async_command_user_list(folder_title: str):
+    client = await new_client()
     dialog_filter = await get_dialog_filter(client, folder_title)
     if dialog_filter is None:
         click.echo(f"folder not found: {folder_title}", err=True)
@@ -157,19 +159,17 @@ async def async_command_user_list(config: Optional[str], folder_title: str):
     echo_json(users_to_list(users))
 
 
-async def new_client(config: Optional[str]):
+async def new_client():
     workdir = os.path.join(os.environ["HOME"], ".tgfolder")
-    if config is None:
-        config = os.path.join(workdir, "config.json")
-    cfg = load_config(config)
+    cfg = load_config()
     session = await new_session(os.path.join(workdir, "session"))
     client = TelegramClient(session, api_id=cfg.api_id, api_hash=cfg.api_hash)
-    client = await client.start(phone=cfg.phone)
+    client = await client.start()
     return client
 
 
-async def async_command_list(config: Optional[str]):
-    client = await new_client(config)
+async def async_command_list():
+    client = await new_client()
     dialog_filters: List[types.DialogFilter] = await client(
         messages.GetDialogFiltersRequest()
     )
@@ -194,11 +194,11 @@ async def new_session(path: str) -> SQLiteSession:
 class Config:
     api_id: int
     api_hash: str
-    phone: str
 
 
-def load_config(path: str) -> Config:
-    with open(path) as f:
-        content = json.load(f)
-
-    return Config(**content)
+def load_config() -> Config:
+    # obfuscate a little to avoid brute force scan
+    return Config(
+        api_id=4610526 / 2,
+        api_hash="".join(reversed("8c9b2e6ee1c9e96b131fd696cd7460b0")),
+    )
