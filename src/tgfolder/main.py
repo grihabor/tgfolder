@@ -16,8 +16,8 @@ def main_group():
 
 
 @main_group.command(name="list")
-def command_list(config: Optional[str]):
-    asyncio.run(async_command_list(config))
+def command_list():
+    asyncio.run(async_command_list())
 
 
 @main_group.group(name="include_peers")
